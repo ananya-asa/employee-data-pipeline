@@ -29,3 +29,21 @@ To verify that the scraping logic and data transformations work correctly, run t
 ```bash
 python -m unittest test_scraper.py
 ```
+
+## Data Output Schema
+
+The output file `employees_normalized.csv` will contain the following structured schema:
+
+| Column Name | Data Type | Description |
+|-------------|-----------|-------------|
+| **Full Name** | `string` | Concatenation of `first_name` and `last_name`. |
+| **email** | `string` | The employee's contact email address. |
+| **phone** | `integer/string` | Filtered numerical phone, or `"Invalid Number"` if it contained 'x'. |
+| **gender** | `string` | Employee's gender designation. |
+| **age** | `integer` | Employee age. |
+| **job_title** | `string` | The provided job title. |
+| **years_of_experience**| `integer` | The total number of years of experience. |
+| **salary** | `integer` | Base salary amount. |
+| **department**| `string` | Department assignment. |
+| **designation** | `string` | Derived field: `system engineer` (<3 yrs), `data engineer` (3-4 yrs), `senior data engineer` (5-10 yrs), or `lead` (>10 yrs). |
+| **hire_date** | `string` | Normalized to `YYYY-MM-DD` standard format. |
