@@ -1,11 +1,12 @@
-# Employee Data Scraper
+# Employee Data Pipeline
 
-A Python project that scrapes employee data from a JSON API, validates its structure, and normalizes it based on specific business rules.
+A Python project that scrapes employee data from JSON APIs and Google Drive files, validates data structures, and normalizes employee records for ingestion into data warehouses.
 
 ## Features
-- **Robust Fetching**: Automatically retries on network timeouts.
-- **Data Normalization**: Re-formats dates, merges names, and classifies job titles based on experience.
-- **Data Validation**: Enforces strict data types across columns.
+- **JSON API Scraper (`scraper.py`)**: Fetches employee JSON data, normalizes dates, merges full names, formats phone numbers, and assigns designations based on experience.
+- **Google Drive File Scraper (`gdrive_scraper.py`)**: Scrapes employee data from Google Drive URLs (CSV/Excel files), validates required data structures, and normalizes employee fields.
+- **Robust Network & Retry Logic**: Gracefully handles network timeouts and retries failed downloads.
+- **Data Validation & Type Enforcement**: Verifies required schemas and enforces standard data types.
 
 ## Setup & Installation
 
@@ -17,33 +18,42 @@ pip install -r requirements.txt
 
 ## Usage
 
-To run the scraper and fetch the data:
+### User Story 1: Scraping Employee Data from API
 ```bash
 python scraper.py
 ```
-*This will fetch the data and output the clean, normalized results to `employees_normalized.csv`.*
+*Outputs clean, normalized results to `employees_normalized.csv`.*
+
+### User Story 2: Scraping Employee Data from Google Drive File
+```bash
+python gdrive_scraper.py
+```
+*Downloads the employee CSV/Excel file from Google Drive and outputs normalized records to `gdrive_employees_normalized.csv`.*
 
 ## Running the Tests
 
-To verify that the scraping logic and data transformations work correctly, run the automated unit test suite:
+To verify that the scraping logic and data transformations work correctly across both user stories:
+
+### User Story 1 Tests (API Scraper):
 ```bash
 python -m unittest test_scraper.py
 ```
 
-## Data Output Schema
+### User Story 2 Tests (Google Drive Scraper):
+```bash
+python -m unittest test_gdrive_scraper.py
+```
 
-The output file `employees_normalized.csv` will contain the following structured schema:
+## Data Output Schema (Google Drive Scraper)
 
-| Column Name | Data Type | Description |
-|-------------|-----------|-------------|
-| **Full Name** | `string` | Concatenation of `first_name` and `last_name`. |
-| **email** | `string` | The employee's contact email address. |
-| **phone** | `integer/string` | Filtered numerical phone, or `"Invalid Number"` if it contained 'x'. |
-| **gender** | `string` | Employee's gender designation. |
-| **age** | `integer` | Employee age. |
-| **job_title** | `string` | The provided job title. |
-| **years_of_experience**| `integer` | The total number of years of experience. |
-| **salary** | `integer` | Base salary amount. |
-| **department**| `string` | Department assignment. |
-| **designation** | `string` | Derived field: `system engineer` (<3 yrs), `data engineer` (3-4 yrs), `senior data engineer` (5-10 yrs), or `lead` (>10 yrs). |
-| **hire_date** | `string` | Normalized to `YYYY-MM-DD` standard format. |
+The output file `gdrive_employees_normalized.csv` contains the mapped schema:
+
+| Standard Field | Mapped From | Description |
+|----------------|-------------|-------------|
+| **Employee ID** | `User Id` | Unique identifier for employee |
+| **First Name** | `First Name` | Employee first name |
+| **Last Name** | `Last Name` | Employee last name |
+| **Email** | `Email` | Employee email address |
+| **Job Title** | `Job Title` | Position title |
+| **Phone Number** | `Phone` | Phone contact number |
+| **Hire Date** | `Date of birth` / `Hire Date` | Date string in `YYYY-MM-DD` standard format |
