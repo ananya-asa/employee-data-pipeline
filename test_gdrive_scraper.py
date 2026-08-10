@@ -27,8 +27,8 @@ class TestGDriveEmployeeScraper(unittest.TestCase):
                 except Exception:
                     pass
 
-    @patch('gdrive_scraper.requests.get')
-    def test_case_1_verify_csv_file_download(self, mock_get):
+    @patch('gdrive_scraper.requests.get')                     
+    def test_case_1_verify_csv_file_download(self, mock_get):  #mock the requests.get(url)
         """Test Case 1: Verify CSV File Download"""
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None

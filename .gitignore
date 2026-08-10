@@ -2,11 +2,19 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 
 # Virtual environments
 venv/
 env/
 .env
 
-# Generated data files
-employees_normalized.csv
+# Generated data & downloaded files
+*.csv
+*.xlsx
+*.xls
+*.zip
+downloaded_employees/
+extracted_files/
+test_extracted_files/
+
