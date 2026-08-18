@@ -38,6 +38,8 @@ REQUIRED_COLUMNS = [
     "Hire Date"
 ]
 
+
+
 def download_and_extract_zip(
     url: str,
     extract_dir: str = "extracted_files",
@@ -81,6 +83,10 @@ def download_and_extract_zip(
             logging.error(f"Extraction failed: {e}")
             raise
 
+
+
+
+
 def select_excel_file(extract_dir: str) -> str:
     """
     Scans the extracted directory to find and select the target Excel file (.xlsx or .xls).
@@ -105,6 +111,9 @@ def select_excel_file(extract_dir: str) -> str:
     logging.info(f"Selected Excel file for processing: '{selected_file}'")
     return selected_file
 
+
+
+
 def read_excel_file(file_path: str) -> pd.DataFrame:
     """
     Reads the Excel file into a pandas DataFrame, validating file format and integrity.
@@ -124,6 +133,9 @@ def read_excel_file(file_path: str) -> pd.DataFrame:
     except Exception as e:
         logging.error(f"Corrupted or invalid Excel file: {e}")
         raise ValueError(f"Invalid or corrupted Excel file: {e}")
+
+
+
 
 def validate_zip_data(df: pd.DataFrame) -> bool:
     """
@@ -160,6 +172,9 @@ def validate_zip_data(df: pd.DataFrame) -> bool:
     logging.info("Data structure validation passed successfully.")
     return True
 
+
+
+
 def normalize_zip_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normalizes employee fields: renames mapped columns, splits Full Name if necessary,
@@ -191,6 +206,9 @@ def normalize_zip_data(df: pd.DataFrame) -> pd.DataFrame:
     other_cols = [c for c in df.columns if c not in REQUIRED_COLUMNS]
     ordered_cols = REQUIRED_COLUMNS + other_cols
     return df[ordered_cols]
+
+
+
 
 def main(
     url: str = DEFAULT_URL,
