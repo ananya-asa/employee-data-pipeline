@@ -8,6 +8,10 @@ __pycache__/
 venv/
 env/
 .env
+.venv/
+
+# VS Code configuration
+.vscode/
 
 # Generated data & downloaded files
 *.csv
@@ -17,4 +21,3 @@ env/
 downloaded_employees/
 extracted_files/
 test_extracted_files/
-

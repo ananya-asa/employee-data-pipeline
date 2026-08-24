@@ -44,13 +44,12 @@ class TestZipEmployeeScraper(unittest.TestCase):
         with open(target_zip, 'rb') as f:
             return f.read()
 
-    # -------------------------------------------------------------
-    # Test Case 1: Verify EXCEL File Download (ZIP Download)
-    # -------------------------------------------------------------
+    # =============================================================
+    # 1. Tests for download_and_extract_zip()
+    # =============================================================
     @patch('zip_scraper.requests.get')
-    def test_case_1_verify_excel_file_download(self, mock_get):
-        """Test Case 1: Verify EXCEL / ZIP File Download with retries and valid ZIP check."""
-        # Create valid zip bytes
+    def test_download_and_extract_zip_success(self, mock_get):
+        """Verify successful ZIP download and extraction."""
         zip_bytes = self._create_mock_zip({"Employee.xlsx": b"mock_content"})
 
         mock_response = Mock()
@@ -71,52 +70,77 @@ class TestZipEmployeeScraper(unittest.TestCase):
             timeout=15
         )
         self.assertTrue(os.path.exists(extracted_dir))
-        extracted_files = os.listdir(extracted_dir)
-        self.assertIn("Employee.xlsx", extracted_files)
+        self.assertIn("Employee.xlsx", os.listdir(extracted_dir))
 
-    # -------------------------------------------------------------
-    # Test Case 2: Verify EXCEL File Extraction
-    # -------------------------------------------------------------
-    def test_case_2_verify_excel_file_extraction(self):
-        """Test Case 2: Verify ZIP Extraction and correct Excel file selection among multiple files."""
+    @patch('zip_scraper.requests.get')
+    def test_download_and_extract_zip_http_retry_failure(self, mock_get):
+        """Verify HTTP errors trigger max retries and raise exception."""
+        mock_get.side_effect = requests.exceptions.HTTPError("500 Server Error")
+        with self.assertRaises(requests.exceptions.HTTPError):
+            download_and_extract_zip("http://dummy_url/fail.zip", retries=2)
+        self.assertEqual(mock_get.call_count, 2)
+
+    @patch('zip_scraper.requests.get')
+    def test_download_and_extract_zip_invalid_archive(self, mock_get):
+        """Verify downloading non-ZIP bytes raises ValueError."""
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.content = b"Not a zip content"
+        mock_get.return_value = mock_response
+
+        with self.assertRaises(ValueError) as ctx:
+            download_and_extract_zip("http://dummy_url/invalid.zip", retries=1)
+        self.assertIn("not a valid ZIP", str(ctx.exception))
+
+    # =============================================================
+    # 2. Tests for select_excel_file()
+    # =============================================================
+    def test_select_excel_file_success(self):
+        """Verify Excel file selection among multiple non-Excel files."""
         os.makedirs(self.test_extract_dir, exist_ok=True)
-
-        # Create multiple files in extract directory (txt, csv, and target xlsx)
         with open(os.path.join(self.test_extract_dir, "notes.txt"), "w") as f:
-            f.write("readme file")
+            f.write("readme")
         with open(os.path.join(self.test_extract_dir, "data.csv"), "w") as f:
-            f.write("a,b,c\n1,2,3")
+            f.write("a,b\n1,2")
 
-        test_df = pd.DataFrame([{
-            "EEID": "E101",
-            "First Name": "Alice",
-            "Last Name": "Smith",
-            "Job Title": "Data Analyst",
-            "Hire Date": "2022-01-15"
-        }])
+        test_df = pd.DataFrame([{"EEID": "E101"}])
         test_df.to_excel(self.test_excel_path, index=False)
 
-        selected_file = select_excel_file(self.test_extract_dir)
-        self.assertTrue(selected_file.endswith(".xlsx"))
+        selected = select_excel_file(self.test_extract_dir)
+        self.assertTrue(selected.endswith(".xlsx"))
 
-        df = read_excel_file(selected_file)
+    def test_select_excel_file_no_excel_found(self):
+        """Verify raising ValueError when no Excel file exists in directory."""
+        os.makedirs(self.test_extract_dir, exist_ok=True)
+        with open(self.test_invalid_path, "w") as f:
+            f.write("text only")
+
+        with self.assertRaises(ValueError) as ctx:
+            select_excel_file(self.test_extract_dir)
+        self.assertIn("No Excel file found", str(ctx.exception))
+
+    # =============================================================
+    # 3. Tests for read_excel_file()
+    # =============================================================
+    def test_read_excel_file_success(self):
+        """Verify reading a valid Excel file returns a DataFrame."""
+        os.makedirs(self.test_extract_dir, exist_ok=True)
+        test_df = pd.DataFrame([{"EEID": "E101", "First Name": "Alice"}])
+        test_df.to_excel(self.test_excel_path, index=False)
+
+        df = read_excel_file(self.test_excel_path)
         self.assertIsInstance(df, pd.DataFrame)
         self.assertEqual(len(df), 1)
         self.assertEqual(df.iloc[0]["EEID"], "E101")
-        self.assertEqual(df.iloc[0]["First Name"], "Alice")
 
-    # -------------------------------------------------------------
-    # Test Case 3: Validate File Type and Format
-    # -------------------------------------------------------------
-    def test_case_3_validate_file_type_and_format(self):
-        """Test Case 3: Validate File Type and Format (detecting invalid formats & corrupted Excel files)."""
-        os.makedirs(self.test_extract_dir, exist_ok=True)
-
-        # Non-existent file error
+    def test_read_excel_file_not_found(self):
+        """Verify FileNotFoundError for missing file path."""
         with self.assertRaises(FileNotFoundError):
             read_excel_file("non_existent_file.xlsx")
 
-        # Unsupported file extension error
+    def test_read_excel_file_unsupported_format(self):
+        """Verify ValueError for non-Excel file extension."""
+        os.makedirs(self.test_extract_dir, exist_ok=True)
         with open(self.test_invalid_path, "w") as f:
             f.write("random content")
 
@@ -124,20 +148,45 @@ class TestZipEmployeeScraper(unittest.TestCase):
             read_excel_file(self.test_invalid_path)
         self.assertIn("Unsupported file format", str(ctx.exception))
 
-        # Corrupted Excel file error (.xlsx with invalid binary content)
+    def test_read_excel_file_corrupted(self):
+        """Verify ValueError when reading a corrupted Excel file."""
+        os.makedirs(self.test_extract_dir, exist_ok=True)
         corrupted_excel = os.path.join(self.test_extract_dir, "corrupted.xlsx")
         with open(corrupted_excel, "wb") as f:
-            f.write(b"NOT_A_ZIP_OR_EXCEL_FILE")
+            f.write(b"NOT_A_VALID_EXCEL_FILE")
 
         with self.assertRaises(ValueError) as ctx:
             read_excel_file(corrupted_excel)
         self.assertIn("Invalid or corrupted Excel file", str(ctx.exception))
 
-    # -------------------------------------------------------------
-    # Test Case 4: Validate Data Structure
-    # -------------------------------------------------------------
-    def test_case_4_validate_data_structure(self):
-        """Test Case 4: Validate Data Structure, column mapping, name splitting, and date normalization."""
+    # =============================================================
+    # 4. Tests for validate_zip_data()
+    # =============================================================
+    def test_validate_zip_data_success(self):
+        """Verify validation passes with required columns or mapped aliases."""
+        raw_df = pd.DataFrame([{
+            "EEID": "E001",
+            "Full Name": "John Doe",
+            "Job Title": "Software Engineer",
+            "Hire Date": "2020/05/10"
+        }])
+        self.assertTrue(validate_zip_data(raw_df))
+
+    def test_validate_zip_data_empty_df(self):
+        """Verify validation fails for empty DataFrame."""
+        empty_df = pd.DataFrame()
+        self.assertFalse(validate_zip_data(empty_df))
+
+    def test_validate_zip_data_missing_core_columns(self):
+        """Verify validation fails when core required columns are missing."""
+        invalid_cols_df = pd.DataFrame([{"Other Field": "Value"}])
+        self.assertFalse(validate_zip_data(invalid_cols_df))
+
+    # =============================================================
+    # 5. Tests for normalize_zip_data()
+    # =============================================================
+    def test_normalize_zip_data_transformation(self):
+        """Verify column mapping, Full Name splitting, date formatting, and column ordering."""
         raw_df = pd.DataFrame([{
             "EEID": "E001",
             "Full Name": "John Doe",
@@ -146,8 +195,6 @@ class TestZipEmployeeScraper(unittest.TestCase):
             "Phone": "555-1234",
             "Hire Date": "2020/05/10"
         }])
-
-        self.assertTrue(validate_zip_data(raw_df))
 
         norm_df = normalize_zip_data(raw_df)
 
@@ -160,47 +207,6 @@ class TestZipEmployeeScraper(unittest.TestCase):
         self.assertEqual(norm_df.iloc[0]["First Name"], "John")
         self.assertEqual(norm_df.iloc[0]["Last Name"], "Doe")
         self.assertEqual(norm_df.iloc[0]["Hire Date"], "2020-05-10")
-
-    # -------------------------------------------------------------
-    # Test Case 5: Handle Missing or Invalid Data
-    # -------------------------------------------------------------
-    @patch('zip_scraper.requests.get')
-    def test_case_5_handle_missing_or_invalid_data(self, mock_get):
-        """Test Case 5: Handle Missing or Invalid Data (retry failures, invalid ZIPs, missing required columns)."""
-        # Download failure after max retries
-        mock_get.side_effect = requests.exceptions.HTTPError("500 Server Error")
-        with self.assertRaises(requests.exceptions.HTTPError):
-            download_and_extract_zip("http://dummy_url/fail.zip", retries=2)
-        self.assertEqual(mock_get.call_count, 2)
-
-        # Invalid ZIP file download (not a ZIP archive)
-        mock_get.reset_mock()
-        mock_response = Mock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.content = b"Not a zip content"
-        mock_get.side_effect = None
-        mock_get.return_value = mock_response
-
-        with self.assertRaises(ValueError) as ctx:
-            download_and_extract_zip("http://dummy_url/invalid.zip", retries=1)
-        self.assertIn("not a valid ZIP", str(ctx.exception))
-
-        # ZIP containing no Excel file
-        os.makedirs(self.test_extract_dir, exist_ok=True)
-        with open(self.test_invalid_path, "w") as f:
-            f.write("only text file here")
-
-        with self.assertRaises(ValueError) as ctx:
-            select_excel_file(self.test_extract_dir)
-        self.assertIn("No Excel file found", str(ctx.exception))
-
-        # Empty DataFrame validation failure
-        empty_df = pd.DataFrame()
-        self.assertFalse(validate_zip_data(empty_df))
-
-        # Missing core columns validation failure
-        invalid_cols_df = pd.DataFrame([{"Other Field": "Value"}])
-        self.assertFalse(validate_zip_data(invalid_cols_df))
 
 if __name__ == '__main__':
     unittest.main()
